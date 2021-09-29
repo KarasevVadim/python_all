@@ -12,14 +12,14 @@ import pandas as pd
 import pymssql 
 
 
-# In[2]:
+# In[273]:
 
 
 server="SQL-retail2.nikamed.local"
 base="Retail2_shops"
 
 
-# In[101]:
+# In[488]:
 
 
 sql="""
@@ -34,77 +34,78 @@ where _Code='0-002'
 sales_ish as (
 select 
        cast(dateadd(year, -2000, d21._date_time) as date) as Дата , 
-         
-       
-       iif(e._EnumOrder=1,'ВозвратДВД','Продажи') as 'ВидОперации'
+       cast(d21._number as varchar(20))+'_'+ cast(dateadd(year, -2000, d21._date_time) as varchar(50)) as  'НомерЧекаККМ',  
+       iif(e._EnumOrder=1,-1,1) as 'ВидОперации'
        ,iif(e._EnumOrder=1, -d21t._Fld6384, d21t._Fld6384 ) as 'Количество'
        ,iif(e._EnumOrder=1, -d21t._Fld6397, d21t._Fld6397) as 'Сумма'
-        
               , cast(r10._idrref as uniqueidentifier) as 'ccМагазин'
-        
        , iif(r2_10._Code is null, cast(r10._idrref as uniqueidentifier), 
                                   cast(r2_10._idrref as uniqueidentifier) ) as 'ccМагазинМотивационный'
-        
-
 from _Document21_VT6378 d21t
-
 left outer join _Document21 d21 on d21t._Document21_IDRRef = d21._IDRRef /*исх чек*/
-
 LEFT OUTER JOIN _reference47 r47 ON d21._Fld6331RRef = r47._idrref /*вид документа*/
 LEFT OUTER JOIN _Enum352 e ON d21._Fld6333RRef = e._idrref /*вид документа в перечислениях чека ккм - 0-продажа, 1-возврат*/
-
 left outer join _Reference10 r10 on d21._Fld6339RRef = r10._idrref /*shop*/
-
-
 left outer join  _Document21 d2_21 on d21._Fld6353RRef=d2_21._idrref /*поиск мотив маг*/
 left outer join _Reference10 r2_10 on d2_21._Fld6339RRef = r2_10._idrref /*shop*/
-
 where d21._marked = 0 and d21._Posted = 1
 and d21._date_time >= '08.01.4021' 
-
-
 union all
-
 select 
        cast(dateadd(year, -2000, d._date_time) as date) as 'Дата', 
-       
-        N'Возврат'
+        cast(d._number as varchar(20))+'_'+ cast(dateadd(year, -2000, d._date_time) as varchar(50)) as  'НомерЧекаККМ',      
+        -1
        , -dt._Fld3984 as 'Количество'
        , -dt._Fld3988 as 'СуммаЧека'
-       
        , cast(r10._idrref as uniqueidentifier) as 'ccМагазин'
-        
        , iif(r2_10._Code is null, cast(r10._idrref as uniqueidentifier), cast(r2_10._idrref as uniqueidentifier) ) as 'ccМагазинМотивационный'
-        
-
 from _Document216_VT3980 dt
-
 left outer join _Document216 d on dt._Document216_IDRRef = d._IDRRef /*исх возвратный чек*/
-
 left outer join _Reference10 r10 on d._Fld3950RRef = r10._idrref /*shop*/
 left outer join  _Reference172 r172  on dt._Fld4001RRef = r172._idrref
 left outer join  _Reference23 r23  on dt._Fld3982RRef = r23._idrref
-
-
 left outer join _Reference131 r131 on d._Fld11137RRef= r131._idrref --  склады
 left outer join _Reference10 r2_10 on r131._Fld2686RRef = r2_10._idrref /*shop к складу*/
-
 where d._marked = 0 and d._Posted = 1
 and d._date_time >= '08.01.4021'
 ),
 -------------суммарные продажи------------------------------------
-sales_sum  as(
-SELECT Дата as date_ss, sum(Сумма) as Summa, ccМагазин, ccМагазинМотивационный FROM sales_ish
-group by Дата,  ccМагазин,ccМагазинМотивационный
+
+sales_sum2 as(
+SELECT 
+
+Дата as date_ss, 
+sum(Сумма) as Summa, 
+ccМагазин, 
+ccМагазинМотивационный,
+ВидОперации 
+
+FROM sales_ish
+group by Дата,  ccМагазин,ccМагазинМотивационный,ВидОперации 
+),
+-------------c кол чеков------------------------------------
+sales_sum as(
+SELECT  
+        date_ss, 
+
+        ccМагазин, 
+        ccМагазинМотивационный,
+        sum(Summa) as Summa, 
+        sum(ВидОперации) as Kol4
+        
+FROM sales_sum2
+
+group by date_ss,  ccМагазин, ccМагазинМотивационный
 )
+
 
 
 SELECT 
 cast(dateadd(year, -2000, i._fld10076) as date) AS date_ii,
 sum(_fld10077) AS Трафик,
 cast( r._Fld2907RRef as uniqueidentifier) AS cсМагазин,
-sum(sales_sum.Summa) as Summa_ii
-
+sum(sales_sum.Summa) as Summa_ii,
+sum(Kol4) as Kol4
 FROM _InfoRg10074 i 
 
 
@@ -120,7 +121,7 @@ group by cast(dateadd(year, -2000, i._fld10076) as date) , cast( r._Fld2907RRef 
 """
 
 
-# In[102]:
+# In[489]:
 
 
 def read_sql(sql,base, serv):
@@ -132,22 +133,28 @@ def read_sql(sql,base, serv):
     return df
 
 
-# In[103]:
+# In[490]:
 
 
 get_ipython().run_cell_magic('time', '', 'df_tr=read_sql(sql,base, server)')
 
 
-# In[104]:
+# In[491]:
 
 
-sum(df_tr['Трафик'])
+sum(df_tr['Трафик'].head())
 
 
-# In[105]:
+# In[492]:
 
 
-df_tr
+sum(df_tr['Kol4'].head(1000))
+
+
+# In[493]:
+
+
+df_tr.info()
 
 
 # conn.close()
@@ -164,124 +171,119 @@ get_ipython().run_cell_magic('time', '', 'df_tr=read_sql(sql,base, server)')
 sum(df_tr['Трафик'])
 
 
+# In[458]:
+
+
+df_tr.head()
+
+
 # In[97]:
 
 
 df_tr
 
 
-# In[ ]:
+# In[460]:
 
 
-sql="""
-
-
-with sales_ish as(
+sql = """
+with sales_ish as (
 select 
-       cast(dateadd(year, -2000, d21._date_time) as date) as 'Дата' , 
-         
-       
-       iif(e._EnumOrder=1,'ВозвратДВД','Продажи') as 'ВидОперации'
+       cast(dateadd(year, -2000, d21._date_time) as date) as Дата , 
+       cast(d21._number as varchar(20))+'_'+ cast(dateadd(year, -2000, d21._date_time) as varchar(50)) as  'НомерЧекаККМ',  
+       iif(e._EnumOrder=1,-1,1) as 'ВидОперации'
        ,iif(e._EnumOrder=1, -d21t._Fld6384, d21t._Fld6384 ) as 'Количество'
        ,iif(e._EnumOrder=1, -d21t._Fld6397, d21t._Fld6397) as 'Сумма'
-        
               , cast(r10._idrref as uniqueidentifier) as 'ccМагазин'
-        
        , iif(r2_10._Code is null, cast(r10._idrref as uniqueidentifier), 
                                   cast(r2_10._idrref as uniqueidentifier) ) as 'ccМагазинМотивационный'
-        
-
 from _Document21_VT6378 d21t
-
 left outer join _Document21 d21 on d21t._Document21_IDRRef = d21._IDRRef /*исх чек*/
-
 LEFT OUTER JOIN _reference47 r47 ON d21._Fld6331RRef = r47._idrref /*вид документа*/
 LEFT OUTER JOIN _Enum352 e ON d21._Fld6333RRef = e._idrref /*вид документа в перечислениях чека ккм - 0-продажа, 1-возврат*/
-
 left outer join _Reference10 r10 on d21._Fld6339RRef = r10._idrref /*shop*/
-
-
 left outer join  _Document21 d2_21 on d21._Fld6353RRef=d2_21._idrref /*поиск мотив маг*/
 left outer join _Reference10 r2_10 on d2_21._Fld6339RRef = r2_10._idrref /*shop*/
-
 where d21._marked = 0 and d21._Posted = 1
 and d21._date_time >= '08.01.4021' 
-
-
 union all
-
 select 
        cast(dateadd(year, -2000, d._date_time) as date) as 'Дата', 
-       
-        N'Возврат'
+        cast(d._number as varchar(20))+'_'+ cast(dateadd(year, -2000, d._date_time) as varchar(50)) as  'НомерЧекаККМ',      
+        -1
        , -dt._Fld3984 as 'Количество'
        , -dt._Fld3988 as 'СуммаЧека'
-       
        , cast(r10._idrref as uniqueidentifier) as 'ccМагазин'
-        
        , iif(r2_10._Code is null, cast(r10._idrref as uniqueidentifier), cast(r2_10._idrref as uniqueidentifier) ) as 'ccМагазинМотивационный'
-        
-
 from _Document216_VT3980 dt
-
 left outer join _Document216 d on dt._Document216_IDRRef = d._IDRRef /*исх возвратный чек*/
-
 left outer join _Reference10 r10 on d._Fld3950RRef = r10._idrref /*shop*/
 left outer join  _Reference172 r172  on dt._Fld4001RRef = r172._idrref
 left outer join  _Reference23 r23  on dt._Fld3982RRef = r23._idrref
-
-
 left outer join _Reference131 r131 on d._Fld11137RRef= r131._idrref --  склады
 left outer join _Reference10 r2_10 on r131._Fld2686RRef = r2_10._idrref /*shop к складу*/
-
 where d._marked = 0 and d._Posted = 1
 and d._date_time >= '08.01.4021'
 ),
 -------------суммарные продажи------------------------------------
-sales_sum  as(
-SELECT Дата, sum(Сумма) as Summa, ccМагазин, ccМагазинМотивационный FROM sales_ish
-group by Дата,  ccМагазин,ccМагазинМотивационный
-)
 
-select * from sales_sum
---select * from sales_ish
+sales_sum2 as(
+SELECT Дата as date_ss, sum(Сумма) as Summa, ccМагазин, ccМагазинМотивационный,ВидОперации FROM sales_ish
+group by Дата,  ccМагазин,ccМагазинМотивационный,ВидОперации 
+)
+-------------кол чеков------------------------------------
+SELECT  date_ss, sum(Summa) as Summa, 
+        ccМагазин, 
+        ccМагазинМотивационный,
+        sum(ВидОперации) as Kol4
+        
+FROM sales_sum2
+
+group by date_ss,  ccМагазин,ccМагазинМотивационный
+
 """
 
 
-# In[ ]:
+# In[461]:
 
 
 def read_sql(sql,base, serv):
     #with pymssql.connect(server=serv ,database = base ,charset =  'cp1251') as  conn:
-    with pymssql.connect(server=serv ,database = base ) as  conn:                  
+    with pymssql.connect(server=serv ,database = base,charset =  'cp1251' ) as  conn:                  
     
         cursor = conn.cursor()  
         df = pd.read_sql( sql,conn)
     return df
 
 
-# In[ ]:
+# In[462]:
 
 
 get_ipython().run_cell_magic('time', '', 'df=read_sql(sql,base, server)')
 
 
-# In[ ]:
+# In[466]:
+
+
+df.info()
+
+
+# In[463]:
 
 
 sum(df['Summa'])
 
 
-# In[ ]:
+# In[464]:
 
 
 df
 
 
-# In[ ]:
+# In[465]:
 
 
-sum(df['Сумма'])
+sum(df['Kol4'])
 
 
 # In[ ]:
