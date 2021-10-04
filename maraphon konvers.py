@@ -19,7 +19,7 @@ server="SQL-retail2.nikamed.local"
 base="Retail2_shops"
 
 
-# In[248]:
+# In[310]:
 
 
 sql="""
@@ -49,7 +49,7 @@ left outer join _Reference10 r10 on d21._Fld6339RRef = r10._idrref /*shop*/
 left outer join  _Document21 d2_21 on d21._Fld6353RRef=d2_21._idrref /*поиск мотив маг*/
 left outer join _Reference10 r2_10 on d2_21._Fld6339RRef = r2_10._idrref /*shop*/
 where d21._marked = 0 and d21._Posted = 1
-and d21._date_time >= '08.01.4021' and d21._date_time < '09.01.4021'
+and d21._date_time >= '08.01.4021' --and d21._date_time < '09.01.4021'
 union all
 select 
        cast(dateadd(year, -2000, d._date_time) as date) as 'Дата', 
@@ -67,7 +67,7 @@ left outer join  _Reference23 r23  on dt._Fld3982RRef = r23._idrref
 left outer join _Reference131 r131 on d._Fld11137RRef= r131._idrref --  склады
 left outer join _Reference10 r2_10 on r131._Fld2686RRef = r2_10._idrref /*shop к складу*/
 where d._marked = 0 and d._Posted = 1
-and d._date_time >= '08.01.4021' and d._date_time  < '09.01.4021'
+and d._date_time >= '08.01.4021' --and d._date_time  < '09.01.4021'
 
 ), 
 -------------суммарные продажи------------------------------------ 
@@ -111,7 +111,7 @@ left outer JOIN _reference142 r ON i._Fld10075RRef = r._IDRRef
 left outer JOIN mag_iskl mi ON r._Fld2907RRef=mi._IDRRef
 
 WHERE i._fld10076 >= '08.01.4021'
-		AND i._fld10076 < '09.01.4021'
+--		AND i._fld10076 < '09.01.4021'
 		AND i._fld10077 > 0
 		AND mi._IDRRef is  null
 GROUP BY  cast(dateadd(year, -2000, i._fld10076) AS date) , cast( r._Fld2907RRef AS uniqueidentifier)
@@ -129,13 +129,14 @@ SELECT tab.date_ii,
 FROM tr_gr tab
 
 left outer join sales_sum on sales_sum.date_ss=tab.date_ii and sales_sum.ccМагазин=tab.cсМагазин
-
-WHERE tab.date_ii >= '08.01.2021' and tab.date_ii < '09.01.2021'
-
+--!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+WHERE tab.date_ii >= '08.01.2021' --and tab.date_ii < '09.01.2021'
+--!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 group by tab.date_ii , tab.cсМагазин, tab.Трафик
 )
 ---------------------------------
 select tab.date_ii ,
+    concat(left(tab.date_ii,8),'01') As period,
     tab.Трафик,
     tab.cсМагазин,
     tab.Summa_ii,
@@ -144,6 +145,8 @@ select tab.date_ii ,
     iif(tab.Трафик=0,0,tab.Kol4/tab.Трафик)  as konv
     
     from traf_ich as tab
+    
+
 """
 
 
@@ -153,7 +156,7 @@ select tab.date_ii ,
 
 
 
-# In[249]:
+# In[311]:
 
 
 def read_sql(sql,base, serv):
@@ -165,19 +168,19 @@ def read_sql(sql,base, serv):
     return df
 
 
-# In[250]:
+# In[312]:
 
 
 get_ipython().run_cell_magic('time', '', 'df_tr=read_sql(sql,base, server)')
 
 
-# In[251]:
+# In[313]:
 
 
 df_tr
 
 
-# In[252]:
+# In[261]:
 
 
 df_tr.info()
@@ -210,24 +213,39 @@ sum(df_tr['Kol4'])
 df_tr.info()
 
 
+# In[320]:
+
+
+sql="""
+--------------план конверсии---------------------
+SELECT cast(dateadd(year,
+		 -2000,
+		 _Fld7062) AS date) AS Период,
+		 (d_v._Fld7072/100) AS Конверсия,
+		 cast(d_v._Fld7071RRef AS uniqueidentifier) AS ссМагазин
+FROM _Document302_VT7069 d_v left outer
+JOIN _Document302 d
+	ON d_v._Document302_idrref = d._idrref
+WHERE d._Marked = 0
+		AND d._Posted=1
+--!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        and _Fld7062 = '4021-08-01'
+--!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+"""
+
+
 # conn.close()
 
-# In[547]:
+# In[321]:
 
 
-get_ipython().run_cell_magic('time', '', 'df_tr=read_sql(sql,base, server)')
+get_ipython().run_cell_magic('time', '', 'df=read_sql(sql,base, server)')
 
 
-# In[548]:
+# In[322]:
 
 
-sum(df_tr['Трафик'])
-
-
-# In[517]:
-
-
-df_tr.head()
+df.head()
 
 
 # In[ ]:
