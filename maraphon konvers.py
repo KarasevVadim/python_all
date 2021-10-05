@@ -19,7 +19,7 @@ server="SQL-retail2.nikamed.local"
 base="Retail2_shops"
 
 
-# In[310]:
+# In[482]:
 
 
 sql="""
@@ -133,19 +133,59 @@ left outer join sales_sum on sales_sum.date_ss=tab.date_ii and sales_sum.ccМа�
 WHERE tab.date_ii >= '08.01.2021' --and tab.date_ii < '09.01.2021'
 --!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 group by tab.date_ii , tab.cсМагазин, tab.Трафик
-)
----------------------------------
+),
+------------------сборка факт показателей---------------
+tab_fact as (
 select tab.date_ii ,
     concat(left(tab.date_ii,8),'01') As period,
     tab.Трафик,
-    tab.cсМагазин,
+    tab.cсМагазин as ccShops,
     tab.Summa_ii,
     tab.Kol4,
     iif(tab.Kol4=0,0,tab.Summa_ii/tab.Kol4)  as sr4,
     iif(tab.Трафик=0,0,tab.Kol4/tab.Трафик)  as konv
     
     from traf_ich as tab
+),    
+--------------------сбока факта к плану--------------------------
+
+--------------план конверсии---------------------
+pl_konv as (
+SELECT cast(dateadd(year,
+		 -2000,
+		 _Fld7062) AS date) AS period,
+		 (d_v._Fld7072/100) AS ПланКонверсии,
+		 cast(d_v._Fld7071RRef AS uniqueidentifier) AS ccShops
+FROM _Document302_VT7069 d_v 
+
+left outer JOIN _Document302 d ON d_v._Document302_idrref = d._idrref
+
+WHERE d._Marked = 0
+		AND d._Posted=1
+--!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        and _Fld7062 = '4021-08-01'
+--!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+)
+
+
+------------------сборка----------------------
+
+select 
+
     
+    pk.period,
+    pk.ПланКонверсии as PlanKonv,
+    pk.ccShops,
+    tf.Kol4 as Kol4,
+    tf.Summa_ii,
+    tf.sr4 as Avg4,
+    tf.konv as konv
+--    * 
+
+from pl_konv pk    
+
+LEFT outer join tab_fact tf ON tf.period=pk.period and tf.ccShops = pk.ccShops
+
 
 """
 
@@ -156,7 +196,7 @@ select tab.date_ii ,
 
 
 
-# In[311]:
+# In[483]:
 
 
 def read_sql(sql,base, serv):
@@ -168,19 +208,19 @@ def read_sql(sql,base, serv):
     return df
 
 
-# In[312]:
+# In[484]:
 
 
 get_ipython().run_cell_magic('time', '', 'df_tr=read_sql(sql,base, server)')
 
 
-# In[313]:
+# In[485]:
 
 
 df_tr
 
 
-# In[261]:
+# In[470]:
 
 
 df_tr.info()
