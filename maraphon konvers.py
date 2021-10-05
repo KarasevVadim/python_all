@@ -12,14 +12,14 @@ import pandas as pd
 import pymssql 
 
 
-# In[142]:
+# In[490]:
 
 
 server="SQL-retail2.nikamed.local"
 base="Retail2_shops"
 
 
-# In[482]:
+# In[584]:
 
 
 sql="""
@@ -161,12 +161,29 @@ FROM _Document302_VT7069 d_v
 left outer JOIN _Document302 d ON d_v._Document302_idrref = d._idrref
 
 WHERE d._Marked = 0
-		AND d._Posted=1
+		AND d._Posted=1 and d_v._Fld7072>0 and d_v._Fld7072  is not null
 --!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         and _Fld7062 = '4021-08-01'
 --!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-)
+),
 
+--------------план ср чека и прочего---------------------
+pl_sr4 as (
+SELECT cast(dateadd(year, -2000, _Fld7090) as date) AS period, 
+        (d_v._Fld7103) AS PlanKol4,
+		 cast(d_v._Fld7101RRef AS uniqueidentifier) AS ccShops,
+		 (d_v._Fld7102) AS PlanVyru4ka,
+          iif(d_v._Fld7103=0,0,d_v._Fld7102/d_v._Fld7103) AS PlanAver4
+         
+FROM _Document304_VT7099 d_v 
+
+left outer JOIN _Document304 d ON d_v._Document304_idrref = d._idrref
+
+WHERE d._Marked = 0
+		AND d._Posted=1 and _Fld7090>='08.01.4021'
+        
+)
+--!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ------------------сборка----------------------
 
@@ -179,13 +196,16 @@ select
     tf.Kol4 as Kol4,
     tf.Summa_ii,
     tf.sr4 as Avg4,
-    tf.konv as konv
+    tf.konv as konv,
+    p4.PlanAver4 ,
+    iif( tf.konv>=pk.ПланКонверсии and tf.sr4>=p4.PlanAver4 ,1,0)   as balls         
+
 --    * 
 
 from pl_konv pk    
 
+LEFT outer join pl_sr4 p4 ON p4.period=pk.period and p4.ccShops = pk.ccShops
 LEFT outer join tab_fact tf ON tf.period=pk.period and tf.ccShops = pk.ccShops
-
 
 """
 
@@ -196,7 +216,7 @@ LEFT outer join tab_fact tf ON tf.period=pk.period and tf.ccShops = pk.ccShops
 
 
 
-# In[483]:
+# In[585]:
 
 
 def read_sql(sql,base, serv):
@@ -208,19 +228,15 @@ def read_sql(sql,base, serv):
     return df
 
 
-# In[484]:
+# In[586]:
 
 
 get_ipython().run_cell_magic('time', '', 'df_tr=read_sql(sql,base, server)')
 
 
-# In[485]:
+# print(df_tr)
 
-
-df_tr
-
-
-# In[470]:
+# In[588]:
 
 
 df_tr.info()
@@ -253,39 +269,45 @@ sum(df_tr['Kol4'])
 df_tr.info()
 
 
-# In[320]:
+# In[514]:
 
 
 sql="""
---------------план конверсии---------------------
-SELECT cast(dateadd(year,
-		 -2000,
-		 _Fld7062) AS date) AS Период,
-		 (d_v._Fld7072/100) AS Конверсия,
-		 cast(d_v._Fld7071RRef AS uniqueidentifier) AS ссМагазин
-FROM _Document302_VT7069 d_v left outer
-JOIN _Document302 d
-	ON d_v._Document302_idrref = d._idrref
+--------------план ср чека и прочего---------------------
+SELECT cast(dateadd(year, -2000, _Fld7090) as date) AS Период, 
+        (d_v._Fld7103) AS PlanKol4,
+		 cast(d_v._Fld7101RRef AS uniqueidentifier) AS ссМагазин,
+		 (d_v._Fld7102) AS PlanVyru4ka,
+          iif(d_v._Fld7103=0,0,d_v._Fld7102/d_v._Fld7103) AS PlanAver4
+         
+FROM _Document304_VT7099 d_v 
+
+left outer JOIN _Document304 d ON d_v._Document304_idrref = d._idrref
+
 WHERE d._Marked = 0
 		AND d._Posted=1
---!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        and _Fld7062 = '4021-08-01'
 --!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 """
 
 
 # conn.close()
 
-# In[321]:
+# In[515]:
 
 
 get_ipython().run_cell_magic('time', '', 'df=read_sql(sql,base, server)')
 
 
-# In[322]:
+# In[516]:
 
 
-df.head()
+df.info()
+
+
+# In[517]:
+
+
+df
 
 
 # In[ ]:
